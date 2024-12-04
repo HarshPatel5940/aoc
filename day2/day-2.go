@@ -52,25 +52,25 @@ func checkSafeAfterConv_p1(processedRows <-chan []int, done chan struct{}, safeR
 			if row[i-1] < row[i] {
 				if decrease {
 					// uh ig skip this shit to next row
-					log.Println("unsafe cause it inc while dec", row)
+					// log.Println("unsafe cause it inc while dec", row)
 					unsafe = true
 					break
 				}
 				if row[i]-row[i-1] > 3 {
 					// now not safe, so skip to next row
-					log.Println("unsafe by val", row)
+					// log.Println("unsafe by val", row)
 					unsafe = true
 					break
 				}
 				increase = true
 			} else if row[i-1] > row[i] {
 				if increase {
-					log.Println("unsafe cause it dec while inc", row)
+					// log.Println("unsafe cause it dec while inc", row)
 					unsafe = true
 					break
 				}
 				if row[i-1]-row[i] > 3 {
-					log.Println("unsafe by val", row)
+					// log.Println("unsafe by val", row)
 					unsafe = true
 					break
 				}
@@ -83,7 +83,7 @@ func checkSafeAfterConv_p1(processedRows <-chan []int, done chan struct{}, safeR
 		}
 
 		if !unsafe {
-			log.Println("Safe", row)
+			// log.Println("Safe", row)
 			safeRowCount.Add(1)
 		}
 
@@ -92,69 +92,58 @@ func checkSafeAfterConv_p1(processedRows <-chan []int, done chan struct{}, safeR
 }
 
 func checkSafeAfterConv_p2(processedRows <-chan []int, done chan struct{}, safeRowCount *atomic.Int64) {
-	var increase, decrease bool
-	var unsafeCount int
-
 	for row := range processedRows {
-		log.Println("visiting", row)
-		increase, decrease = false, false
-		unsafeCount = 0
-		for i, _ := range row {
-			log.Printf("%d is at index %d and unsafeCount %d", row, i, unsafeCount)
-			if i == 0 {
-				continue
-			}
-
-			if row[i-1] < row[i] {
-				increase = true
-			} else if row[i-1] > row[i] {
-				decrease = true
-			} else {
-				unsafeCount++
-			}
-
-			if increase {
-				if (row[i] - row[i-1]) > 3 {
-					unsafeCount++
-					t := 0
-					if i < len(row)-1 {
-						t = i + 1
-					} else {
-						t = i
-					}
-					if (row[t] - row[i-1]) > 3 {
-						unsafeCount++
-					}
-				}
-			}
-
-			if decrease {
-				if (row[i-1] - row[i]) > 3 {
-					unsafeCount++
-					t := 0
-					if i < len(row)-1 {
-						t = i + 1
-					} else {
-						t = i
-					}
-					if (row[i-1] - row[t]) > 3 {
-						unsafeCount++
-					}
-				}
-			}
-
-		}
-
-		if unsafeCount <= 1 {
-			log.Println("Safe", row)
+		if isSequenceSafe(row) {
 			safeRowCount.Add(1)
-		} else {
-			log.Println("Unsafe", unsafeCount, row)
+			continue
 		}
 
+		// um so brute force check all combinations if we find 1 comb to unsfe we break it
+		// and we ig skip one one to check jhmmm
+		for i := 0; i < len(row); i++ {
+			newRow := make([]int, 0, len(row)-1)
+			newRow = append(newRow, row[:i]...)
+			newRow = append(newRow, row[i+1:]...)
+
+			if isSequenceSafe(newRow) {
+				safeRowCount.Add(1)
+				break
+			}
+		}
 	}
 	done <- struct{}{}
+}
 
+func isSequenceSafe(row []int) bool {
+	if len(row) < 2 {
+		return true
+	}
+
+	isIncreasing := row[1] > row[0]
+
+	for i := 1; i < len(row); i++ {
+		diff := row[i] - row[i-1]
+
+		if isIncreasing && diff <= 0 {
+			return false
+		}
+		if !isIncreasing && diff >= 0 {
+			return false
+		}
+
+		if abs(diff) < 1 || abs(diff) > 3 {
+			return false
+		}
+	}
+
+	return true
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func solve(filepath string, checkSafe func(processedRows <-chan []int, done chan struct{}, safeRowCount *atomic.Int64)) {
@@ -192,7 +181,6 @@ func solve(filepath string, checkSafe func(processedRows <-chan []int, done chan
 }
 
 func main() {
-	// solve("./day2/d2p1.txt", checkSafeAfterConv_p1)
-
+	solve("./day2/d2p1.txt", checkSafeAfterConv_p1)
 	solve("./day2/d2p1.txt", checkSafeAfterConv_p2)
 }
